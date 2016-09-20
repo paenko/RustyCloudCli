@@ -1,0 +1,6 @@
+[package]
+name = "RustyCloudCli"
+version = "0.1.0"
+authors = ["Kevin Per <kevp.per@gmail.com>"]
+
+[dependencies]
