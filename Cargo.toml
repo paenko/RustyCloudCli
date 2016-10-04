@@ -4,3 +4,9 @@ version = "0.1.0"
 authors = ["Kevin Per <kevp.per@gmail.com>"]
 
 [dependencies]
+docopt = "0.6"
+rustc-serialize = "0.3"  # if you're using `derive(RustcDecodable)`
+uuid = {version="*",features=["rustc-serialize", "v4"]}
+
+[dependencies.rest_client]
+git = "https://github.com/FHanko/rest_client"
