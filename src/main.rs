@@ -2,8 +2,11 @@ extern crate docopt;
 extern crate rustc_serialize;
 extern crate uuid;
 extern crate rest_client;
+extern crate bincode;
 
 use std::path::Path;
+use std::io::BufReader;
+use std::collections::{HashSet, HashMap};
 use std::io::{Read, Write};
 use uuid::Uuid;
 use docopt::Docopt;
@@ -13,6 +16,10 @@ use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::os::unix;
+
+use rustc_serialize::Encodable;
+use bincode::rustc_serialize::{encode_into, encode, decode, decode_from};
+use bincode::SizeLimit;
 
 const USAGE: &'static str = "
 Rusty Cloud.
@@ -30,10 +37,11 @@ struct Args {
     cmd_get: bool,
     cmd_delete: bool,
     arg_path: Option<String>,
-    arg_id: Option<u64>,
+    arg_id: Option<String>,
 }
 
-#[derive(Debug,RustcEncodable)]
+
+#[derive(RustcEncodable,RustcDecodable)]
 struct DocFile {
     filename: String,
     fileId: Uuid,
@@ -41,16 +49,22 @@ struct DocFile {
 }
 
 impl DocFile{
-    fn new(path : String) -> Self
+    fn open(path : &Path) -> Self
     {
-      let mut f : File = File::open(&path).unwrap();
-      let mut buffer = Vec::new();
-      f.read_to_end(&mut buffer);
+      let res : DocFile = decode_from(&mut File::open(&path).unwrap(), SizeLimit::Infinite).unwrap();
+      res
+    }
+
+    fn create(path : &Path) -> Self
+    {
+      let mut fl : File = File::open(path).unwrap();
+      let mut buf = Vec::new();
+      fl.read_to_end(&mut buf);
       DocFile
       {
-        filename: path,
+        filename: path.to_str().unwrap().to_string(),
         fileId: Uuid::new_v4(),
-        payload: buffer,
+        payload: buf,
       }
     }
 
@@ -64,9 +78,10 @@ impl DocFile{
       }
     }
 
-    fn writeFile(&self) -> io::Result<()> {
-      let mut f = try!(File::create(self.filename));
-      f.write_all(s.as_bytes())
+    fn writeFile(&self) {
+      let mut f =
+            OpenOptions::new().write(true).create(true).open("Test").unwrap();
+      encode_into(self, &mut f, SizeLimit::Infinite);
     }
 
 
@@ -77,7 +92,10 @@ fn main() {
                       .and_then(|dopt| dopt.decode())
                       .unwrap_or_else(|e| e.exit());
     println!("{:?}", args);
-    
+
+    let mut SyncedFiles = HashMap::new();
+    SyncedFiles.insert("1", "Data.txt");
+
     if(args.cmd_sync)
     {
       sync(args);
@@ -90,13 +108,21 @@ fn main() {
     {
       delete(args);
     }
+    let mut f =
+          OpenOptions::new().write(true).create(true).open("Synced.syn").unwrap();
+    encode_into(&SyncedFiles, &mut f, SizeLimit::Infinite);
 }
 
 fn sync(args: Args)
 {
   let rp = &args.arg_path.unwrap();
   let p = Path::new(&rp);
-  println!("{}", readAll(&p).unwrap());
+  let object = DocFile::create(&p);
+  println!("{}", object.payload.len());
+  let res = RestClient::post("http://127.0.0.1:8080/file",
+                                    &json::encode(&object).unwrap(), 
+                                    "application/json").unwrap();
+  println!("{}", res);
   //println!("{}", RestClient::post("https://jsonplaceholder.typicode.com/posts",
   //                                  &json::encode(&object).unwrap(), 
   //                                  "application/json").unwrap());
@@ -104,10 +130,12 @@ fn sync(args: Args)
 
 fn get(args: Args)
 {
-    let st = RestClient::get("https://jsonplaceholder.typicode.com/posts").unwrap().body;
+    let sid = &args.arg_id.unwrap();
+    let url = format!("https://127.0.0.1:8080/files/{}", sid);
+    let st = RestClient::get(&url).unwrap().body;
     //decode
-    let ps = "Data.txt";
-    let p = Path::new(&ps);
+    let mut f = OpenOptions::new().write(true).create(true).open("Test").unwrap();
+    encode_into(&st, &mut f, SizeLimit::Infinite);
 }
 
 fn delete(args: Args)
@@ -116,12 +144,3 @@ fn delete(args: Args)
 }
 
 //File Handler
-
-fn readAll(path: &Path) -> io::Result<String> {
-    let mut f = try!(File::open(path));
-    let mut s = String::new();
-    match f.read_to_string(&mut s) {
-        Ok(_) => Ok(s),
-        Err(e) => Err(e),
-    }
-}
