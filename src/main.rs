@@ -3,6 +3,7 @@ extern crate rustc_serialize;
 extern crate uuid;
 extern crate rest_client;
 extern crate bincode;
+extern crate base64;
 
 use std::path::Path;
 use std::io::BufReader;
@@ -20,6 +21,7 @@ use std::os::unix;
 use rustc_serialize::Encodable;
 use bincode::rustc_serialize::{encode_into, encode, decode, decode_from};
 use bincode::SizeLimit;
+use base64::{encode, decode};
 
 const USAGE: &'static str = "
 Rusty Cloud.
@@ -45,7 +47,7 @@ struct Args {
 struct DocFile {
     filename: String,
     fileId: Uuid,
-    payload: Vec<u8>,
+    payload: String,
 }
 
 impl DocFile{
@@ -64,7 +66,7 @@ impl DocFile{
       {
         filename: path.to_str().unwrap().to_string(),
         fileId: Uuid::new_v4(),
-        payload: buf,
+        payload: base64::encode(&buf),
       }
     }
 
@@ -74,7 +76,7 @@ impl DocFile{
       {
         filename: fln,
         fileId: fid,
-        payload: py,
+        payload: base64::encode(&py),
       }
     }
 
