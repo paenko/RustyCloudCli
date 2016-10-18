@@ -21,7 +21,6 @@ use std::os::unix;
 use rustc_serialize::Encodable;
 use bincode::rustc_serialize::{encode_into, encode, decode, decode_from};
 use bincode::SizeLimit;
-use base64::{encode, decode};
 
 const USAGE: &'static str = "
 Rusty Cloud.
