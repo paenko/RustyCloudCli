@@ -54,11 +54,11 @@ struct DocFile {
     timeEdited: DateTime<Local>,
 }
 
-impl DocFile{
-    fn open(path : &Path) -> Self
-    {
-      let res : DocFile = decode_from(&mut File::open(&path).unwrap(), SizeLimit::Infinite).unwrap();
-      res
+impl DocFile {
+    fn open(path: &Path) -> Self {
+        let res: DocFile = decode_from(&mut File::open(&path).unwrap(), SizeLimit::Infinite)
+            .unwrap();
+        res
     }
 
     fn create(path : &Path) -> Self
@@ -84,21 +84,19 @@ impl DocFile{
         payload: base64::encode(&py),
         timeEdited: Local::now(),
       }
+
     }
 
     fn writeFile(&self) {
-      let mut f =
-            OpenOptions::new().write(true).create(true).open("Test").unwrap();
-      encode_into(self, &mut f, SizeLimit::Infinite);
+        let mut f = OpenOptions::new().write(true).create(true).open("Test").unwrap();
+        encode_into(self, &mut f, SizeLimit::Infinite);
     }
-
-
 }
 
 fn main() {
-    let args : Args = Docopt::new(USAGE)
-                      .and_then(|dopt| dopt.decode())
-                      .unwrap_or_else(|e| e.exit());
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|dopt| dopt.decode())
+        .unwrap_or_else(|e| e.exit());
     println!("{:?}", args);
 
     let mut SyncedFiles = Vec::new();
@@ -122,6 +120,7 @@ fn main() {
     
     let mut f =
             OpenOptions::new().write(true).create(true).open("Synced.syn").unwrap();
+
     encode_into(&SyncedFiles, &mut f, SizeLimit::Infinite);
     //Encode Synced
 }
@@ -142,23 +141,22 @@ fn post(args: Args, vs :&mut Vec<String>)
                                     &json::encode(&object).unwrap(), 
                                     "application/json").unwrap();
   println!("{}", res);
+
 }
 
-fn get(args: Args)
-{
+fn get(args: Args) {
     let sid = &args.arg_id.unwrap();
     let url = format!("http://127.0.0.1:8080/files/{}", sid);
     let st = RestClient::get(&url).unwrap().body;
-    //decode
+    // decode
     let mut f = OpenOptions::new().write(true).create(true).open("Test").unwrap();
     encode_into(&st, &mut f, SizeLimit::Infinite);
 }
 
-fn delete(args: Args)
-{
+fn delete(args: Args) {
     let sid = &args.arg_id.unwrap();
-    let url = format!("http://127.0.0.1:8080/file/{}", sid);
+    let url = format!("http://127.0.0.1:8080/files/{}", sid);
     println!("{}", RestClient::delete(&url).unwrap());
 }
 
-//File Handler
+// File Handler
