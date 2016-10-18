@@ -132,7 +132,7 @@ fn sync(args: Args)
 fn get(args: Args)
 {
     let sid = &args.arg_id.unwrap();
-    let url = format!("https://127.0.0.1:8080/files/{}", sid);
+    let url = format!("http://127.0.0.1:8080/files/{}", sid);
     let st = RestClient::get(&url).unwrap().body;
     //decode
     let mut f = OpenOptions::new().write(true).create(true).open("Test").unwrap();
@@ -141,7 +141,9 @@ fn get(args: Args)
 
 fn delete(args: Args)
 {
-    println!("{}", RestClient::delete("http://localhost:8081/file/1").unwrap());
+    let sid = &args.arg_id.unwrap();
+    let url = format!("http://127.0.0.1:8080/file/{}", sid);
+    println!("{}", RestClient::delete(&url).unwrap());
 }
 
 //File Handler
