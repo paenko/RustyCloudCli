@@ -4,29 +4,34 @@ extern crate uuid;
 extern crate rest_client;
 extern crate bincode;
 extern crate base64;
+extern crate chrono;
 
 use std::path::Path;
 use std::io::BufReader;
+use std::collections::BTreeMap;
 use std::collections::{HashSet, HashMap};
 use std::io::{Read, Write};
 use uuid::Uuid;
 use docopt::Docopt;
 use rest_client::RestClient;
-use rustc_serialize::json;
+//use rustc_serialize::json;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::os::unix;
+use chrono::*;
 
 use rustc_serialize::Encodable;
 use bincode::rustc_serialize::{encode_into, encode, decode, decode_from};
 use bincode::SizeLimit;
+use rustc_serialize::json::{self,ToJson,Json};
 
 const USAGE: &'static str = "
 Rusty Cloud.
 
 Usage:
-  rustyc sync <path> <stop>
+  rustyc sync
+  rustyc post <path>
   rustyc get <id>
   rustyc delete <id>
 ";
@@ -34,19 +39,19 @@ Usage:
 #[derive(Debug,RustcDecodable)]
 struct Args {
     cmd_sync: bool,
-    arg_stop: Option<String>,
+    cmd_post: bool,
     cmd_get: bool,
     cmd_delete: bool,
     arg_path: Option<String>,
     arg_id: Option<String>,
 }
 
-
 #[derive(RustcEncodable,RustcDecodable)]
 struct DocFile {
     filename: String,
     fileId: Uuid,
     payload: String,
+    timeEdited: DateTime<Local>,
 }
 
 impl DocFile{
@@ -66,6 +71,7 @@ impl DocFile{
         filename: path.to_str().unwrap().to_string(),
         fileId: Uuid::new_v4(),
         payload: base64::encode(&buf),
+        timeEdited: Local::now(),
       }
     }
 
@@ -76,6 +82,7 @@ impl DocFile{
         filename: fln,
         fileId: fid,
         payload: base64::encode(&py),
+        timeEdited: Local::now(),
       }
     }
 
@@ -94,12 +101,15 @@ fn main() {
                       .unwrap_or_else(|e| e.exit());
     println!("{:?}", args);
 
-    let mut SyncedFiles = HashMap::new();
-    SyncedFiles.insert("1", "Data.txt");
-
+    let mut SyncedFiles = Vec::new();
+    SyncedFiles = decode_from(&mut File::open("Synced.syn").unwrap(), SizeLimit::Infinite).unwrap();
     if(args.cmd_sync)
     {
       sync(args);
+    }
+    else if(args.cmd_post)
+    {
+      post(args, &mut SyncedFiles);
     }
     else if(args.cmd_get)
     {
@@ -109,14 +119,22 @@ fn main() {
     {
       delete(args);
     }
+    
     let mut f =
-          OpenOptions::new().write(true).create(true).open("Synced.syn").unwrap();
+            OpenOptions::new().write(true).create(true).open("Synced.syn").unwrap();
     encode_into(&SyncedFiles, &mut f, SizeLimit::Infinite);
+    //Encode Synced
 }
 
-fn sync(args: Args)
+fn sync(args : Args)
 {
-  let rp = &args.arg_path.unwrap();
+
+}
+
+fn post(args: Args, vs :&mut Vec<String>)
+{
+  let rp = args.arg_path.unwrap().clone();
+  vs.push(rp.clone());
   let p = Path::new(&rp);
   let object = DocFile::create(&p);
   println!("{}", object.payload.len());
@@ -124,9 +142,6 @@ fn sync(args: Args)
                                     &json::encode(&object).unwrap(), 
                                     "application/json").unwrap();
   println!("{}", res);
-  //println!("{}", RestClient::post("https://jsonplaceholder.typicode.com/posts",
-  //                                  &json::encode(&object).unwrap(), 
-  //                                  "application/json").unwrap());
 }
 
 fn get(args: Args)

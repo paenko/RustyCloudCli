@@ -9,6 +9,7 @@ rustc-serialize = "0.3"  # if you're using `derive(RustcDecodable)`
 uuid = {version="*",features=["rustc-serialize", "v4"]}
 bincode = "*"
 base64 = "~0.2.0"
+chrono = { version = "0.2", features = ["rustc-serialize"] }
 
 [dependencies.rest_client]
 git = "https://github.com/FHanko/rest_client"
