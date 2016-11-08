@@ -49,9 +49,9 @@ struct Args {
 #[derive(RustcEncodable,RustcDecodable)]
 struct DocFile {
     filename: String,
-    fileId: Uuid,
+    file_id: Uuid,
     payload: String,
-    timeEdited: DateTime<Local>,
+    lastEdited: DateTime<Local>,
 }
 
 impl DocFile {
@@ -69,9 +69,9 @@ impl DocFile {
       DocFile
       {
         filename: path.to_str().unwrap().to_string(),
-        fileId: Uuid::new_v4(),
+        file_id: Uuid::new_v4(),
         payload: base64::encode(&buf),
-        timeEdited: Local::now(),
+        lastEdited: Local::now(),
       }
     }
 
@@ -80,9 +80,9 @@ impl DocFile {
       DocFile
       {
         filename: fln,
-        fileId: fid,
+        file_id: fid,
         payload: base64::encode(&py),
-        timeEdited: Local::now(),
+        lastEdited: Local::now(),
       }
 
     }
@@ -94,20 +94,23 @@ impl DocFile {
 }
 
 fn main() {
-    let args: Args = Docopt::new(USAGE)
+    let mut args: Args = Docopt::new(USAGE)
         .and_then(|dopt| dopt.decode())
         .unwrap_or_else(|e| e.exit());
     println!("{:?}", args);
 
-    let mut SyncedFiles = Vec::new();
-    SyncedFiles = decode_from(&mut File::open("Synced.syn").unwrap(), SizeLimit::Infinite).unwrap();
+    let mut SyncedFiles = match decode_from(&mut File::open("Synced.syn").unwrap(), SizeLimit::Infinite){
+        Ok(e) => e,
+        Err(err)  => Vec::new()
+    };
+
     if(args.cmd_sync)
     {
-      sync(args);
+      sync(args, SyncedFiles.clone());
     }
     else if(args.cmd_post)
     {
-      post(args, &mut SyncedFiles);
+      post(args, SyncedFiles.clone());
     }
     else if(args.cmd_get)
     {
@@ -125,15 +128,27 @@ fn main() {
     //Encode Synced
 }
 
-fn sync(args : Args)
+fn sync(mut args : Args, mut vs : Vec<String>)
 {
+  for x in vs.clone().into_iter()
+  {
+    let a = Args {
+      arg_path:Some(x.to_string()),
+      cmd_sync: args.cmd_sync,
+      cmd_post: args.cmd_post,
+      cmd_get: args.cmd_get,
+      cmd_delete: args.cmd_delete,
+      arg_id: None,
+    };
 
+    post(a, vs.clone());
+  }
 }
 
-fn post(args: Args, vs :&mut Vec<String>)
+fn post(mut args: Args, mut vs : Vec<String>)
 {
   let rp = args.arg_path.unwrap().clone();
-  vs.push(rp.clone());
+  vs.push(rp.clone()); 
   let p = Path::new(&rp);
   let object = DocFile::create(&p);
   println!("{}", object.payload.len());
