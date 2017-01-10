@@ -168,21 +168,21 @@ fn post(mut args: Args,  vs: &mut Vec<TrackingFile>) {
     let p = Path::new(&rp);
     let object = DocFile::create(&p);
     println!("{}", object.payload.len());
-    let res = RestClient::post("http://127.0.0.1:8080/file",
+    let res = RestClient::post("http://127.0.0.1:8080/file/push",
                                &json::encode(&object).unwrap(),
                                "application/json")
         .unwrap();
-    let NT = json::decode(&res.body);
-    vs.push(NT.unwrap());
+    
+    let TF = TrackingFile::new(Uuid::parse_str(&res.body).unwrap(), "temp".to_string(), format!("{}", p.display()));
+    vs.push(TF);
 }
 
 fn get(args: Args) {
     let sid = &args.arg_id.unwrap();
-    let url = format!("http://127.0.0.1:8080/files/{}", sid);
+    let url = format!("http://127.0.0.1:8080/file/pull");
     let st = RestClient::get(&url).unwrap().body;
     // decode
-    let mut f = OpenOptions::new().write(true).create(true).open("Test").unwrap();
-    encode_into(&st, &mut f, SizeLimit::Infinite);
+    println!("{}", st);
 }
 
 fn delete(args: Args) {
