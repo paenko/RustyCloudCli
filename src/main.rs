@@ -88,7 +88,7 @@ impl DocFile {
             filename: path.to_str().unwrap().to_string(),
             file_id: Uuid::new_v4(),
             payload: base64::encode(&buf),
-            lastEdited: Local::now(),
+            lastEdited: UTC::now(),
         }
     }
 
@@ -97,7 +97,7 @@ impl DocFile {
             filename: fln,
             file_id: fid,
             payload: base64::encode(&py),
-            lastEdited: Local::now(),
+            lastEdited: UTC::now(),
         }
 
     }
@@ -140,20 +140,21 @@ fn sync(mut args: Args, mut vs: Vec<TrackingFile>) {
     for x in vs.clone().into_iter() {
         // SYNCED aktuell?
         let res = match RestClient::post("http://127.0.0.1:8080/file/sync",
-                                         &json::encode(x).unwrap(),
+                                         &json::encode(&x).unwrap(),
                                          "application/json") {
             Ok(_) => {
                 // update on server
                 let args = Args {
-                    arg_path: Some(x.to_string()),
+                    arg_path: Some(x.path.to_string()),
                     cmd_sync: false,
-                    cmd_post: false,
+                    cmd_post: true,
                     cmd_get: false,
                     cmd_delete: false,
-                    arg_id: x.file_id,
+                    arg_id: Some(x.file_id.to_string()),
                 };
 
                 // TODO UPDATE HERE
+                post(args, vs);
             }
             Err(_) => {
                 // Override local file
@@ -162,7 +163,7 @@ fn sync(mut args: Args, mut vs: Vec<TrackingFile>) {
     }
 }
 
-fn post(mut args: Args) {
+fn post(mut args: Args, mut vs: Vec<TrackingFile>) {
     let rp = args.arg_path.unwrap().clone();
     let p = Path::new(&rp);
     let object = DocFile::create(&p);
@@ -171,8 +172,8 @@ fn post(mut args: Args) {
                                &json::encode(&object).unwrap(),
                                "application/json")
         .unwrap();
-    println!("{}", res);
-
+    let NT = json::decode(&res.body);
+    vs.push(NT.unwrap());
 }
 
 fn get(args: Args) {
