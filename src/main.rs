@@ -123,7 +123,7 @@ fn main() {
     if (args.cmd_sync) {
         sync(args, SyncedFiles.clone());
     } else if (args.cmd_post) {
-        post(args, SyncedFiles.clone());
+        post(args, &mut SyncedFiles.clone());
     } else if (args.cmd_get) {
         get(args);
     } else if (args.cmd_delete) {
@@ -154,7 +154,7 @@ fn sync(mut args: Args, mut vs: Vec<TrackingFile>) {
                 };
 
                 // TODO UPDATE HERE
-                post(args, vs);
+                post(args, &mut vs);
             }
             Err(_) => {
                 // Override local file
@@ -163,7 +163,7 @@ fn sync(mut args: Args, mut vs: Vec<TrackingFile>) {
     }
 }
 
-fn post(mut args: Args, mut vs: Vec<TrackingFile>) {
+fn post(mut args: Args,  vs: &mut Vec<TrackingFile>) {
     let rp = args.arg_path.unwrap().clone();
     let p = Path::new(&rp);
     let object = DocFile::create(&p);
