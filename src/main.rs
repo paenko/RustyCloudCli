@@ -46,7 +46,7 @@ struct Args {
     arg_id: Option<String>,
 }
 
-#[derive(RustcEncodable,RustcDecodable)]
+#[derive(Clone,RustcEncodable,RustcDecodable)]
 struct DocFile {
     filename: String,
     file_id: Uuid,
@@ -78,6 +78,19 @@ impl DocFile {
         let res: DocFile = decode_from(&mut File::open(&path).unwrap(), SizeLimit::Infinite)
             .unwrap();
         res
+    }
+
+    fn new(file_id: Uuid, path: &Path) -> Self
+    {
+        let mut fl: File = File::open(path).unwrap();
+        let mut buf = Vec::new();
+        fl.read_to_end(&mut buf);
+        DocFile {
+            filename: path.to_str().unwrap().to_string(),
+            file_id: file_id,
+            payload: base64::encode(&buf),
+            lastEdited: UTC::now(),
+        }
     }
 
     fn create(path: &Path) -> Self {
@@ -121,22 +134,31 @@ fn main() {
         };
 
     if (args.cmd_sync) {
-        sync(args, SyncedFiles.clone());
+        sync(args, &mut SyncedFiles);
     } else if (args.cmd_post) {
-        post(args, &mut SyncedFiles.clone());
+        post(args, &mut SyncedFiles);
     } else if (args.cmd_get) {
-        get(args);
+        get(&args);
     } else if (args.cmd_delete) {
         delete(args);
     }
 
-    let mut f = OpenOptions::new().write(true).create(true).open("Synced.syn").unwrap();
-
-    encode_into(&SyncedFiles, &mut f, SizeLimit::Infinite);
     // Encode Synced
+    let mut f = OpenOptions::new().write(true).create(true).open("Synced.syn").unwrap();
+    encode_into(&SyncedFiles, &mut f, SizeLimit::Infinite);
 }
 
-fn sync(mut args: Args, mut vs: Vec<TrackingFile>) {
+fn sync(mut args: Args, vs: &mut Vec<TrackingFile>) {
+
+    let url = format!("http://127.0.0.1:8080/files");
+    let st = RestClient::get(&url).unwrap().body;
+    let Doc: Vec<DocFile> = json::decode(&st).unwrap();
+
+    for d in Doc.iter()
+    {
+        vs.push(TrackingFile::new(d.clone().file_id, d.clone().filename,d.clone().filename));
+    }
+
     for x in vs.clone().into_iter() {
         // SYNCED aktuell?
         let res = match RestClient::post("http://127.0.0.1:8080/file/sync",
@@ -153,8 +175,31 @@ fn sync(mut args: Args, mut vs: Vec<TrackingFile>) {
                     arg_id: Some(x.file_id.to_string()),
                 };
 
-                // TODO UPDATE HERE
-                post(args, &mut vs);
+                // TODO UPDATE HERE7
+                if(Path::new(&x.path).exists())
+                {
+                let remotetime = get(&args).lastEdited;
+                    if(remotetime<x.lastEdited)
+                    {
+                        post(args,  vs);
+                    }
+                    else
+                    {
+                        let DF = get(&args);
+                    let mut f = OpenOptions::new().write(true).create(true).open(DF.filename).unwrap();
+                    let bytes = base64::decode(&DF.payload).unwrap();
+                    f.write_all(bytes.as_slice());
+                    }
+                }
+                else {
+                
+                let DF = get(&args);
+                let mut f = OpenOptions::new().write(true).create(true).open(DF.filename).unwrap();
+                let bytes = base64::decode(&DF.payload).unwrap();
+                f.write_all(bytes.as_slice());
+                //vs.puhs()
+                }
+                
             }
             Err(_) => {
                 // Override local file
@@ -163,26 +208,36 @@ fn sync(mut args: Args, mut vs: Vec<TrackingFile>) {
     }
 }
 
+
 fn post(mut args: Args,  vs: &mut Vec<TrackingFile>) {
     let rp = args.arg_path.unwrap().clone();
     let p = Path::new(&rp);
-    let object = DocFile::create(&p);
+    let object = match args.arg_id {
+        Some(i) =>  {
+         DocFile::new(Uuid::parse_str(&i).unwrap(), &p)
+    }
+    None =>  {
+         DocFile::create(&p)
+    }
+    };
     println!("{}", object.payload.len());
     let res = RestClient::post("http://127.0.0.1:8080/file/push",
                                &json::encode(&object).unwrap(),
                                "application/json")
         .unwrap();
     
-    let TF = TrackingFile::new(Uuid::parse_str(&res.body).unwrap(), "temp".to_string(), format!("{}", p.display()));
+    let TF = TrackingFile::new(Uuid::parse_str(&res.body).unwrap(), p.file_name().unwrap().to_str().unwrap().to_string(), format!("{}", p.display()));
     vs.push(TF);
+    
 }
 
-fn get(args: Args) {
-    let sid = &args.arg_id.unwrap();
-    let url = format!("http://127.0.0.1:8080/file/pull");
+fn get(args: &Args) -> DocFile {
+    let sid = args.arg_id.clone().unwrap();
+    let url = format!("http://127.0.0.1:8080/files/{}", sid);
     let st = RestClient::get(&url).unwrap().body;
     // decode
     println!("{}", st);
+    json::decode(&st).unwrap()
 }
 
 fn delete(args: Args) {
