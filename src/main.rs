@@ -156,6 +156,7 @@ fn sync(mut args: Args, vs: &mut Vec<TrackingFile>) {
 
     for d in Doc.iter()
     {
+        println!("{} {}", d.clone().file_id, d.clone().filename);
         vs.push(TrackingFile::new(d.clone().file_id, d.clone().filename,d.clone().filename));
     }
 
@@ -178,14 +179,15 @@ fn sync(mut args: Args, vs: &mut Vec<TrackingFile>) {
                 // TODO UPDATE HERE7
                 if(Path::new(&x.path).exists())
                 {
-                let remotetime = get(&args).lastEdited;
-                    if(remotetime<x.lastEdited)
+                    let remotetime = get(&args).lastEdited;
+                    if(remotetime>x.lastEdited)
                     {
                         post(args,  vs);
                     }
                     else
                     {
-                        let DF = get(&args);
+                    let DF = get(&args);
+                    fs::remove_file(DF.clone().filename);
                     let mut f = OpenOptions::new().write(true).create(true).open(DF.filename).unwrap();
                     let bytes = base64::decode(&DF.payload).unwrap();
                     f.write_all(bytes.as_slice());
