@@ -63,12 +63,12 @@ struct TrackingFile {
 }
 
 impl TrackingFile {
-    pub fn new(file_id: Uuid, filename: String, path: String) -> Self {
+    pub fn new(file_id: Uuid, filename: String, path: String, le: DateTime<UTC>) -> Self {
         TrackingFile {
             file_id: file_id,
             filename: filename,
             path: path,
-            lastEdited: UTC::now(),
+            lastEdited: le,
         }
     }
 }
@@ -156,10 +156,10 @@ fn sync(mut args: Args, vs: &mut Vec<TrackingFile>) {
 
     for d in Doc.iter()
     {
-        println!("{} {}", d.clone().file_id, d.clone().filename);
-        vs.push(TrackingFile::new(d.clone().file_id, d.clone().filename,d.clone().filename));
+        //println!("{} {}", d.clone().file_id, d.clone().filename);
+        vs.push(TrackingFile::new(d.clone().file_id, d.clone().filename,d.clone().filename, d.clone().lastEdited));
     }
-
+    let mut lastTrack : TrackingFile = TrackingFile::new(Uuid::new_v4(), "und".to_string(), "und".to_string(), UTC::now());
     for x in vs.clone().into_iter() {
         // SYNCED aktuell?
         let res = match RestClient::post("http://127.0.0.1:8080/file/sync",
@@ -179,18 +179,24 @@ fn sync(mut args: Args, vs: &mut Vec<TrackingFile>) {
                 // TODO UPDATE HERE7
                 if(Path::new(&x.path).exists())
                 {
-                    let remotetime = get(&args).lastEdited;
-                    if(remotetime>x.lastEdited)
+                    let got = get(&args);
+                    let remotetime = got.clone().lastEdited;
+                    if(lastTrack.filename == "und") { lastTrack.lastEdited = x.lastEdited; }
+                    if(remotetime<lastTrack.lastEdited)
                     {
-                        post(args,  vs);
+                        //lastTrack = x;
+                        //post(args,  vs);
+                        //println!("post {:?} {:?} {:?}", lastTrack.filename, lastTrack.lastEdited, String::from_utf8(base64::decode(&got.payload).unwrap()));
                     }
                     else
                     {
-                    let DF = get(&args);
-                    fs::remove_file(DF.clone().filename);
-                    let mut f = OpenOptions::new().write(true).create(true).open(DF.filename).unwrap();
-                    let bytes = base64::decode(&DF.payload).unwrap();
-                    f.write_all(bytes.as_slice());
+                        lastTrack = x;
+                        println!("get {:?} {:?} {:?}", lastTrack.filename, lastTrack.lastEdited, String::from_utf8(base64::decode(&got.payload).unwrap()));
+                        let DF = get(&args);
+                        fs::remove_file(DF.clone().filename);
+                        let mut f = OpenOptions::new().write(true).create(true).open(DF.filename).unwrap();
+                        let bytes = base64::decode(&DF.payload).unwrap();
+                        f.write_all(bytes.as_slice());
                     }
                 }
                 else {
@@ -222,13 +228,13 @@ fn post(mut args: Args,  vs: &mut Vec<TrackingFile>) {
          DocFile::create(&p)
     }
     };
-    println!("{}", object.payload.len());
+    //println!("{}", object.payload.len());
     let res = RestClient::post("http://127.0.0.1:8080/file/push",
                                &json::encode(&object).unwrap(),
                                "application/json")
         .unwrap();
     
-    let TF = TrackingFile::new(Uuid::parse_str(&res.body).unwrap(), p.file_name().unwrap().to_str().unwrap().to_string(), format!("{}", p.display()));
+    let TF = TrackingFile::new(Uuid::parse_str(&res.body).unwrap(), p.file_name().unwrap().to_str().unwrap().to_string(), format!("{}", p.display()), UTC::now());
     vs.push(TF);
     
 }
@@ -238,7 +244,7 @@ fn get(args: &Args) -> DocFile {
     let url = format!("http://127.0.0.1:8080/files/{}", sid);
     let st = RestClient::get(&url).unwrap().body;
     // decode
-    println!("{}", st);
+    //println!("{}", st);
     json::decode(&st).unwrap()
 }
 
