@@ -125,7 +125,6 @@ fn main() {
     let mut args: Args = Docopt::new(USAGE)
         .and_then(|dopt| dopt.decode())
         .unwrap_or_else(|e| e.exit());
-    println!("{:?}", args);
 
     let mut SyncedFiles: Vec<TrackingFile> =
         match decode_from(&mut File::open("Synced.syn").unwrap(), SizeLimit::Infinite) {
@@ -191,7 +190,7 @@ fn sync(mut args: Args, vs: &mut Vec<TrackingFile>) {
                     else
                     {
                         lastTrack = x;
-                        println!("get {:?} {:?} {:?}", lastTrack.filename, lastTrack.lastEdited, String::from_utf8(base64::decode(&got.payload).unwrap()));
+                        //println!("get {:?} {:?} {:?}", lastTrack.filename, lastTrack.lastEdited, String::from_utf8(base64::decode(&got.payload).unwrap()));
                         let DF = get(&args);
                         fs::remove_file(DF.clone().filename);
                         let mut f = OpenOptions::new().write(true).create(true).open(DF.filename).unwrap();
@@ -251,7 +250,7 @@ fn get(args: &Args) -> DocFile {
 fn delete(args: Args) {
     let sid = &args.arg_id.unwrap();
     let url = format!("http://127.0.0.1:8080/files/{}", sid);
-    println!("{}", RestClient::delete(&url).unwrap());
+    //println!("{}", RestClient::delete(&url).unwrap());
 }
 
 // File Handler
