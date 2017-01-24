@@ -34,6 +34,7 @@ Usage:
   rustyc post <path>
   rustyc get <id>
   rustyc delete <id>
+  rustyc list
 ";
 
 #[derive(Debug,RustcDecodable)]
@@ -41,6 +42,7 @@ struct Args {
     cmd_sync: bool,
     cmd_post: bool,
     cmd_get: bool,
+    cmd_list: bool,
     cmd_delete: bool,
     arg_path: Option<String>,
     arg_id: Option<String>,
@@ -54,7 +56,7 @@ struct DocFile {
     lastEdited: DateTime<UTC>,
 }
 
-#[derive(Clone,RustcEncodable,RustcDecodable)]
+#[derive(Clone,RustcEncodable,RustcDecodable, Hash, Eq, PartialEq)]
 struct TrackingFile {
     filename: String,
     file_id: Uuid,
@@ -137,14 +139,35 @@ fn main() {
     } else if (args.cmd_post) {
         post(args, &mut SyncedFiles);
     } else if (args.cmd_get) {
-        get(&args);
+        getSave(&args);
     } else if (args.cmd_delete) {
         delete(args);
+    } else if (args.cmd_list) {
+        list(args, &mut SyncedFiles);
     }
 
     // Encode Synced
     let mut f = OpenOptions::new().write(true).create(true).open("Synced.syn").unwrap();
     encode_into(&SyncedFiles, &mut f, SizeLimit::Infinite);
+}
+
+fn list(mut args: Args, vs: &mut Vec<TrackingFile>)
+{
+    let mut unique : Vec<Uuid> = Vec::new();
+    for x in vs.clone().into_iter()
+    {
+        let mut dup = false;
+        for u in unique.clone().into_iter()
+        {
+            if(x.file_id == u) {dup = true;}
+        }
+        
+        if(dup == false)
+        {
+            println!("name: {}  id: {}", x.filename, x.file_id);
+            unique.push(x.file_id);
+        }
+    }
 }
 
 fn sync(mut args: Args, vs: &mut Vec<TrackingFile>) {
@@ -171,6 +194,7 @@ fn sync(mut args: Args, vs: &mut Vec<TrackingFile>) {
                     cmd_sync: false,
                     cmd_post: true,
                     cmd_get: false,
+                    cmd_list: false,
                     cmd_delete: false,
                     arg_id: Some(x.file_id.to_string()),
                 };
@@ -245,6 +269,13 @@ fn get(args: &Args) -> DocFile {
     // decode
     //println!("{}", st);
     json::decode(&st).unwrap()
+}
+
+fn getSave(args: &Args) {
+    let DF = get(&args);
+    let mut f = OpenOptions::new().write(true).create(true).open(DF.filename).unwrap();
+    let bytes = base64::decode(&DF.payload).unwrap();
+    f.write_all(bytes.as_slice());
 }
 
 fn delete(args: Args) {
